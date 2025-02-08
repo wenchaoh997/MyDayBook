@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import '../models/note.dart';
+import 'canvas_area.dart';
+import 'tool_bar.dart';
+import 'page_thumbnails.dart';
+import 'layer_list.dart';
 
 class CanvasPage extends StatefulWidget {
   const CanvasPage({super.key});
@@ -19,11 +24,21 @@ class CanvasPageState extends State<CanvasPage> {
       TransformationController();
   // 缩放比例
   double _currentScale = 1.0;
+  // 每页的图层列表
+  Map<int, List<Layer>> pageLayers = {};
+  // 控制图层列表的可见性
+  bool isLayerListVisible = false;
+  // 当前选中的模块
+  String? selectedModule;
 
   @override
   void initState() {
     super.initState();
     _transformationController.addListener(_onScaleChanged);
+    // 初始化每页的图层
+    for (var page in pages) {
+      pageLayers[page] = [Layer(id: 'layer1'), Layer(id: 'layer2')]; // 每页初始一个图层
+    }
   }
 
   @override
@@ -57,13 +72,16 @@ class CanvasPageState extends State<CanvasPage> {
               maxScale: 3.5, // 最大缩放比例
               child: CanvasArea(
                 selectedTool: selectedTool,
+                layers: isLayerListVisible
+                    ? pageLayers[pages.first]!
+                    : [], // 根据可见性显示图层
               ),
             ),
           ),
           // 缩放比例显示
           Positioned(
             top: 16.0,
-            right: 16.0,
+            left: 16.0,
             child: Container(
               padding: EdgeInsets.all(8.0),
               decoration: BoxDecoration(
@@ -106,152 +124,27 @@ class CanvasPageState extends State<CanvasPage> {
                   });
                 },
                 isThumbnailsVisible: isThumbnailsVisible,
+                onToggleLayerList: () {
+                  setState(() {
+                    isLayerListVisible = !isLayerListVisible;
+                  });
+                },
+                isLayerListVisible: isLayerListVisible,
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class CanvasArea extends StatelessWidget {
-  final String selectedTool;
-
-  const CanvasArea({super.key, required this.selectedTool});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.all(8.0),
-      width: 595.0, // A4宽度（像素）
-      height: 842.0, // A4高度（像素）
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12.0),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8.0,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: GestureDetector(
-        onPanUpdate: (details) {
-          // 根据选择的工具进行绘图或擦除
-          if (selectedTool == 'brush') {
-            // 添加绘图逻辑
-          } else if (selectedTool == 'eraser') {
-            // 添加擦除逻辑
-          }
-        },
-        child: CustomPaint(
-          size: Size(595.0, 842.0), // 确保CustomPaint的大小与A4一致
-          painter: CanvasPainter(),
-        ),
-      ),
-    );
-  }
-}
-
-class PageThumbnails extends StatelessWidget {
-  final List<int> pages;
-  final Function(int) onPageSelected;
-
-  const PageThumbnails(
-      {super.key, required this.pages, required this.onPageSelected});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 100.0,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: pages.length,
-        itemBuilder: (context, index) {
-          return GestureDetector(
-            onTap: () => onPageSelected(index),
-            child: Container(
-              width: 70.0,
-              margin: EdgeInsets.symmetric(horizontal: 4.0, vertical: 4.0),
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(8.0),
-                border: Border.all(
-                  color: Colors.blue,
-                  width: 2.0,
-                ),
-              ),
-              child: Center(
-                child: Text(
-                  'Page ${pages[index]}',
-                  style: TextStyle(fontSize: 16.0),
-                ),
-              ),
+          if (isLayerListVisible)
+            LayerList(
+              layers: pageLayers[pages.first]!,
+              selectedModule: selectedModule,
+              onModuleSelected: (String moduleId) {
+                setState(() {
+                  selectedModule = moduleId;
+                });
+              },
             ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class ToolBar extends StatelessWidget {
-  final String selectedTool;
-  final Function(String) onToolSelected;
-  final VoidCallback onToggleThumbnails;
-  final bool isThumbnailsVisible;
-
-  const ToolBar({
-    super.key,
-    required this.selectedTool,
-    required this.onToolSelected,
-    required this.onToggleThumbnails,
-    required this.isThumbnailsVisible,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-      padding: EdgeInsets.symmetric(vertical: 8.0),
-      decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(12.0),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          IconButton(
-            icon: Icon(Icons.brush),
-            color: selectedTool == 'brush' ? Colors.blue : Colors.black,
-            onPressed: () => onToolSelected('brush'),
-          ),
-          IconButton(
-            icon: Icon(Icons.clear),
-            color: selectedTool == 'eraser' ? Colors.blue : Colors.black,
-            onPressed: () => onToolSelected('eraser'),
-          ),
-          IconButton(
-            icon: Icon(
-                isThumbnailsVisible ? Icons.visibility_off : Icons.visibility),
-            onPressed: onToggleThumbnails,
-          ),
         ],
       ),
     );
-  }
-}
-
-class CanvasPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    // 在这里实现绘图逻辑
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return true;
   }
 }
