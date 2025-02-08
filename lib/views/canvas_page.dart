@@ -12,6 +12,32 @@ class CanvasPageState extends State<CanvasPage> {
   String selectedTool = 'brush';
   // 示例页面数据
   List<int> pages = List.generate(5, (index) => index + 1); // 假设有5页
+  // 控制页面缩略图的可见性
+  bool isThumbnailsVisible = false;
+  // TransformationController用于控制缩放和平移
+  final TransformationController _transformationController =
+      TransformationController();
+  // 缩放比例
+  double _currentScale = 1.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _transformationController.addListener(_onScaleChanged);
+  }
+
+  @override
+  void dispose() {
+    _transformationController.removeListener(_onScaleChanged);
+    _transformationController.dispose();
+    super.dispose();
+  }
+
+  void _onScaleChanged() {
+    setState(() {
+      _currentScale = _transformationController.value.getMaxScaleOnAxis();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,25 +45,69 @@ class CanvasPageState extends State<CanvasPage> {
       appBar: AppBar(
         title: Text('新建笔记'),
       ),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: Stack(
         children: [
-          CanvasArea(
-            selectedTool: selectedTool,
+          // 画布区域
+          Positioned.fill(
+            child: InteractiveViewer(
+              transformationController: _transformationController,
+              panEnabled: true, // 允许平移
+              scaleEnabled: true, // 允许缩放
+              minScale: 0.5, // 最小缩放比例
+              maxScale: 3.5, // 最大缩放比例
+              child: CanvasArea(
+                selectedTool: selectedTool,
+              ),
+            ),
           ),
-          PageThumbnails(
-            pages: pages,
-            onPageSelected: (int pageIndex) {
-              // 选择页面的逻辑
-            },
+          // 缩放比例显示
+          Positioned(
+            top: 16.0,
+            right: 16.0,
+            child: Container(
+              padding: EdgeInsets.all(8.0),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+              child: Text(
+                '缩放: ${(_currentScale * 100).toStringAsFixed(0)}%',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
           ),
-          ToolBar(
-            selectedTool: selectedTool,
-            onToolSelected: (String tool) {
-              setState(() {
-                selectedTool = tool;
-              });
-            },
+          // 页面缩略图和工具栏
+          Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              AnimatedContainer(
+                duration: Duration(milliseconds: 300),
+                height: isThumbnailsVisible ? 100.0 : 0.0,
+                child: Visibility(
+                  visible: isThumbnailsVisible,
+                  child: PageThumbnails(
+                    pages: pages,
+                    onPageSelected: (int pageIndex) {
+                      // 选择页面的逻辑
+                    },
+                  ),
+                ),
+              ),
+              ToolBar(
+                selectedTool: selectedTool,
+                onToolSelected: (String tool) {
+                  setState(() {
+                    selectedTool = tool;
+                  });
+                },
+                onToggleThumbnails: () {
+                  setState(() {
+                    isThumbnailsVisible = !isThumbnailsVisible;
+                  });
+                },
+                isThumbnailsVisible: isThumbnailsVisible,
+              ),
+            ],
           ),
         ],
       ),
@@ -130,9 +200,16 @@ class PageThumbnails extends StatelessWidget {
 class ToolBar extends StatelessWidget {
   final String selectedTool;
   final Function(String) onToolSelected;
+  final VoidCallback onToggleThumbnails;
+  final bool isThumbnailsVisible;
 
-  const ToolBar(
-      {super.key, required this.selectedTool, required this.onToolSelected});
+  const ToolBar({
+    super.key,
+    required this.selectedTool,
+    required this.onToolSelected,
+    required this.onToggleThumbnails,
+    required this.isThumbnailsVisible,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -155,6 +232,11 @@ class ToolBar extends StatelessWidget {
             icon: Icon(Icons.clear),
             color: selectedTool == 'eraser' ? Colors.blue : Colors.black,
             onPressed: () => onToolSelected('eraser'),
+          ),
+          IconButton(
+            icon: Icon(
+                isThumbnailsVisible ? Icons.visibility_off : Icons.visibility),
+            onPressed: onToggleThumbnails,
           ),
         ],
       ),
